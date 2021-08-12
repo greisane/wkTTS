@@ -176,7 +176,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 					return TRUE;
 				}
 				useDebugPrint = GetPrivateProfileIntA("General", "UseDebugPrint", 0, iniPath);
-				speaking = GetPrivateProfileIntA("TTS", "Enabled", 1, iniPath);
+				speaking = GetPrivateProfileIntA("TTS", "Enable", 1, iniPath);
 				readPlayerName = GetPrivateProfileIntA("TTS", "ReadPlayerName", 0, iniPath);
 				readPlayerChat = GetPrivateProfileIntA("TTS", "ReadPlayerChat", 1, iniPath);
 				readSystemMessages = GetPrivateProfileIntA("TTS", "ReadSystemMessages", 0, iniPath);
