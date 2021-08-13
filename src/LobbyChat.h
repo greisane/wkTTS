@@ -10,11 +10,12 @@ class LobbyChat
 {
 public:
 	typedef void(*LobbyChatCallback)(std::string type, std::string name, std::string team, std::string text);
-	typedef void(*CommandCallback)(const char* args);
+	typedef void(*CommandCallback)(std::string args);
 	typedef std::tuple<std::string, CommandCallback> CommandAndCallback;
 
 	static void install();
 	static void print(const std::string msg);
+	static bool isInLobby();
 
 	static void registerHostCommandCallback(std::string command, CommandCallback callback);
 	static void registerClientCommandCallback(std::string command, CommandCallback callback);

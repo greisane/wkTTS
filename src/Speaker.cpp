@@ -7,7 +7,6 @@
 #include "../lang/cmu_grapheme_lang/cmu_grapheme_lang.h"
 #include "../lang/cmu_grapheme_lex/cmu_grapheme_lex.h"
 #include "flite.h"
-#include "native_audio.h"
 
 Speaker::Speaker(float volume)
 	: voice(nullptr)
@@ -189,34 +188,6 @@ void Speaker::work()
 					}
 				}
 			}
-
-
-			/*utt = flite_synth_text(text.c_str(), voice);
-			if (!utt)
-			{
-				printf("Failed to synthesize utterance");
-				continue;
-			}
-
-			wave = utt_wave(utt);
-			if (!wave)
-			{
-				printf("Failed to synthesize wave");
-				continue;
-			}
-
-			if (!audiodev || audiodev->sps != wave->sample_rate || audiodev->channels != wave->num_channels || audiodev->fmt != CST_AUDIO_LINEAR16)
-			{
-				audiodev = audio_open(wave->sample_rate, wave->num_channels, CST_AUDIO_LINEAR16);
-			}
-			if (!audiodev)
-			{
-				printf("Failed to open audio device");
-				continue;
-			}
-
-			wavePos = 0;
-			waveLen = wave->num_samples * wave->num_channels;*/
 		}
 	} while (!quit);
 }

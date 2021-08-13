@@ -1,7 +1,7 @@
 # wkTTS
 WormKit module adding text-to-speech to Worms Armageddon multiplayer games.
 
-Several voices are available, automatically chosen for each player based on their name.
+While enabled, chat is automatically read aloud. A different voice is chosen for each player based on their nickname.
 
 # Installation
 

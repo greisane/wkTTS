@@ -38,32 +38,44 @@ DWORD __stdcall GameChat::hookConstructDDGameWrapper(DWORD DD_Game_a2, DWORD DD_
 int(__stdcall* origShowChatMessage)(DWORD ddgame, int color, char* msg, int unk);
 int __stdcall GameChat::hookShowChatMessage(DWORD ddgame, int color, char* msg, int unk)
 {
-	static const std::regex normalMessageRgx(R"(^\[([^\]]*)\] (.*)$)");
-	static const std::regex anonymousMessageRgx(R"(^(?:.* )?\[(.*)\]$)");
-	static const std::regex whisperToMessageRgx(R"(^\*([^\*]*)\* (.*)$)");
-	static const std::regex whisperFromMessageRgx(R"(^<([^<]*)> (.*)$)");
+	static const std::regex chatRgx(R"(^\[([^\]]*)\] (.*)$)");
+	static const std::regex teamChatRgx(R"(^<<([^<]*)>> (.*)$)");
+	static const std::regex anonymousRgx(R"(^(?:.* )?\[(.*)\]$)");  // Named captures would be nice
+	static const std::regex whisperToRgx(R"(^\*([^\*]*)\* (.*)$)");
+	static const std::regex whisperFromRgx(R"(^<([^<]*)> (.*)$)");
+	//static const std::regex whisperRgx(R"(^([^\.]+)\.\.([^\.]+): (.*)$)");  // Only in replays
 
 	GameChatType type;
 	std::string name, text;
 	std::cmatch matches;
-	if (std::regex_search(msg, matches, normalMessageRgx))
+	if (strcmp(msg, "**Whisper**") == 0)
+	{
+		// Ignore other team whispers
+	}
+	else if (std::regex_search(msg, matches, chatRgx))
 	{
 		type = GameChatType::Normal;
 		name = matches[1];
 		text = matches[2];
 	}
-	else if (std::regex_search(msg, matches, anonymousMessageRgx))
+	else if (std::regex_search(msg, matches, teamChatRgx))
+	{
+		type = GameChatType::Team;
+		name = matches[1];
+		text = matches[2];
+	}
+	else if (std::regex_search(msg, matches, anonymousRgx))
 	{
 		type = GameChatType::Anonymous;
 		text = matches[1];
 	}
-	else if (std::regex_search(msg, matches, whisperToMessageRgx))
+	else if (std::regex_search(msg, matches, whisperToRgx))
 	{
 		type = GameChatType::WhisperTo;
 		name = matches[1];
 		text = matches[2];
 	}
-	else if (std::regex_search(msg, matches, whisperFromMessageRgx))
+	else if (std::regex_search(msg, matches, whisperFromRgx))
 	{
 		type = GameChatType::WhisperFrom;
 		name = matches[1];
@@ -90,11 +102,12 @@ int __stdcall GameChat::hookShowChatMessage(DWORD ddgame, int color, char* msg, 
 
 int GameChat::onChatInput(int a1, char* msg, int a3)
 {
+	std::string msgs = msg;
 	for (const CommandAndCallback& cb : commandCallbacks)
 	{
-		if (strcmp(msg, std::get<0>(cb).c_str()) == 0)
+		if (msgs.starts_with(std::get<0>(cb)))
 		{
-			std::get<1>(cb)(nullptr);
+			std::get<1>(cb)(msgs.substr(std::get<0>(cb).length()));
 			return 1;
 		}
 	}
@@ -156,6 +169,11 @@ void GameChat::install()
 		"??????xxxxxxxxxxxxx????xxxx????xxxx",
 		(DWORD*)&hookOnChatInput,
 		(DWORD*)&origOnChatInput);
+}
+
+bool GameChat::isInGame()
+{
+	return addrDDGame != 0;
 }
 
 void GameChat::registerCommandCallback(std::string command, CommandCallback callback)

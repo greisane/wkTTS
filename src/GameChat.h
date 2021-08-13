@@ -9,6 +9,7 @@ typedef unsigned long DWORD;
 enum class GameChatType
 {
 	Normal,
+	Team,
 	Action,
 	Anonymous,
 	WhisperTo,
@@ -20,11 +21,12 @@ class GameChat
 {
 public:
 	typedef void(*GameChatCallback)(GameChatType type, std::string name, std::string text, int color);
-	typedef void(*CommandCallback)(const char* args);
+	typedef void(*CommandCallback)(std::string args);
 	typedef std::tuple<std::string, CommandCallback> CommandAndCallback;
 
 	static void install();
 	static void print(const std::string msg);
+	static bool isInGame();
 
 	static void registerCommandCallback(std::string command, CommandCallback callback);
 	static void registerChatCallback(GameChatCallback callback);

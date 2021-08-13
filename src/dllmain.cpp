@@ -30,6 +30,18 @@ unsigned short crc16(const unsigned char* data_p, unsigned char length)
 	return crc;
 }
 
+void printChat(std::string msg)
+{
+	if (GameChat::isInGame())
+	{
+		GameChat::print(msg);
+	}
+	else if (LobbyChat::isInLobby())
+	{
+		LobbyChat::print(msg);
+	}
+}
+
 void speak(std::string name, std::string text)
 {
 	if (!speaking)
@@ -84,7 +96,7 @@ void speakLobbyChatMessage(std::string type, std::string name, std::string team,
 
 void speakGameChatMessage(GameChatType type, std::string name, std::string text, int color)
 {
-	static const std::array<std::string, 3> systemMessages = {
+	static const std::array<std::string, 2> systemMsgsEndWith = {
 		"has turned on the crate finder feature of wkRubberWorm (http://worms2d.info/RubberWorm).",
 		"has turned off the crate finder.",
 	};
@@ -94,6 +106,10 @@ void speakGameChatMessage(GameChatType type, std::string name, std::string text,
 		if (type == GameChatType::Normal && readPlayerChat)
 		{
 			speak(name, readPlayerName ? tfm::format("%s says: %s", name, text) : text);
+		}
+		else if (type == GameChatType::Team && readPlayerChat)
+		{
+			speak(name, readPlayerName ? tfm::format("%s says to team: %s", name, text) : text);
 		}
 		else if (type == GameChatType::Anonymous && readPlayerChat)
 		{
@@ -109,7 +125,7 @@ void speakGameChatMessage(GameChatType type, std::string name, std::string text,
 			speak(name, readPlayerName ? tfm::format("Whisper from %s: %s", name, text) : text);
 		}
 		else if (type == GameChatType::Action
-			&& (readSystemMessages || std::none_of(systemMessages.begin(), systemMessages.end(), [&text](std::string s) { return text.ends_with(s); })))
+			&& (readSystemMessages || std::none_of(systemMsgsEndWith.begin(), systemMsgsEndWith.end(), [&text](std::string s) { return text.ends_with(s); })))
 		{
 			speak("", text);
 		}
@@ -120,7 +136,7 @@ void speakGameChatMessage(GameChatType type, std::string name, std::string text,
 	}
 }
 
-void shutUp(const char* args)
+void shutUp(std::string args)
 {
 	for (Speaker* speaker : speakers)
 	{
@@ -128,27 +144,23 @@ void shutUp(const char* args)
 	}
 }
 
-void setVolume(const char* args)
+void setVolume(std::string args)
 {
-	int volume = std::clamp(atoi(args), 0, 100);
-
-	if (volume > 0)
+	try
 	{
+		const int volume = std::clamp(std::stoi(args), 0, 100);
 		for (Speaker* speaker : speakers)
 		{
 			speaker->setVolume(volume / 100.f);
 		}
-		std::string msg = tfm::format("Text to speech set to %d%% volume.", volume);
-		LobbyChat::print(msg);
-		GameChat::print(msg);
+		printChat(tfm::format("Text to speech volume set to %d%%.", volume));
 	}
-	else
+	catch (std::exception)
 	{
 		speaking = !speaking;
 		if (speaking)
 		{
-			LobbyChat::print("Text to speech enabled.");
-			GameChat::print("Text to speech enabled.");
+			printChat("Text to speech enabled.");
 		}
 		else
 		{
@@ -156,8 +168,7 @@ void setVolume(const char* args)
 			{
 				speaker->shutUp();
 			}
-			LobbyChat::print("Text to speech disabled.");
-			GameChat::print("Text to speech disabled.");
+			printChat("Text to speech disabled.");
 		}
 	}
 }
@@ -176,7 +187,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 					return TRUE;
 				}
 				useDebugPrint = GetPrivateProfileIntA("General", "UseDebugPrint", 0, iniPath);
-				speaking = GetPrivateProfileIntA("TTS", "Enable", 1, iniPath);
+				speaking = GetPrivateProfileIntA("TTS", "StartEnabled", 0, iniPath);
 				readPlayerName = GetPrivateProfileIntA("TTS", "ReadPlayerName", 0, iniPath);
 				readPlayerChat = GetPrivateProfileIntA("TTS", "ReadPlayerChat", 1, iniPath);
 				readSystemMessages = GetPrivateProfileIntA("TTS", "ReadSystemMessages", 0, iniPath);
@@ -215,12 +226,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 			}
 			break;
 		case DLL_PROCESS_DETACH:
-			while (!speakers.empty())
-			{
-				delete speakers.back();
-				speakers.pop_back();
-			}
-			break;
 		case DLL_THREAD_ATTACH:
 		case DLL_THREAD_DETACH:
 		default:

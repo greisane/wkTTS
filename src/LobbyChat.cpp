@@ -81,7 +81,6 @@ int __stdcall LobbyChat::hookLobbyDisplayMessage(int a1, char* msg)
 	{
 		callback(type, name, team, text);
 	}
-
 	return origLobbyDisplayMessage(a1, msg);
 }
 
@@ -126,6 +125,11 @@ void LobbyChat::print(const std::string msg)
 	{
 		origLobbyDisplayMessage((int)lobbyHostScreen + 0x10318, const_cast<char*>(buff.c_str()));
 	}
+}
+
+bool LobbyChat::isInLobby()
+{
+	return (lobbyClientScreen != 0) || (lobbyHostScreen != 0);
 }
 
 void LobbyChat::install()
