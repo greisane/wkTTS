@@ -24,6 +24,12 @@ add_library(wkTTS SHARED
     ${CMAKE_CURRENT_BINARY_DIR}/resource.rc
 )
 
+set_property(TARGET
+    wkTTS hacklib
+    flite_audio flite_hrg flite_regex flite_stats flite_utils flite_cg flite_lexicon flite_speech flite_synth flite_wavesynth flite_cmu_grapheme_lang
+    flite_cmu_grapheme_lex flite_cmulex flite_cmu_us_kal flite_cmu_us_kal16 flite_cmu_us_slt flite_cmu_us_rms flite_cmu_us_awb flite_usenglish
+    PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 target_link_libraries(wkTTS
     PUBLIC hacklib
     PUBLIC libMinHook-x86-v141-mt
