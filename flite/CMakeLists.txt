@@ -100,10 +100,11 @@ add_library(flite_utils
 
 target_include_directories(flite_utils PUBLIC inc)
 
-if(${WIN32})
-    target_link_libraries(flite_utils
-        PUBLIC WSock32)
-endif()
+#if(${WIN32})
+#    target_link_libraries(flite_utils
+#        PUBLIC WSock32)
+#endif()
+add_compile_definitions(CST_NO_SOCKETS)
 
 add_library(flite_cg
     src/cg/cst_cg.c
