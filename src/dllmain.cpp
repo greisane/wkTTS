@@ -7,6 +7,7 @@
 #include "Speaker.h"
 #include "LobbyChat.h"
 #include "GameChat.h"
+#include "Debug.h"
 
 bool useDebugPrint = false;
 bool readPlayerName = false;
@@ -14,6 +15,7 @@ bool readPlayerChat = false;
 bool readSystemMessages = false;
 bool speaking = true;
 std::vector<Speaker*> speakers;
+std::thread loaderThread;
 
 unsigned short crc16(const unsigned char* data_p, unsigned char length)
 {
@@ -48,6 +50,10 @@ void speak(std::string name, std::string text)
 	{
 		return;
 	}
+	if(loaderThread.joinable())
+	{
+		loaderThread.join();
+	}
 
 	Speaker* chosen = nullptr;
 	for (Speaker* speaker : speakers)
@@ -80,17 +86,14 @@ void speak(std::string name, std::string text)
 
 void speakLobbyChatMessage(std::string type, std::string name, std::string team, std::string text)
 {
-	if (speakers.size())
+	if (type == "GLB" && readPlayerChat)
 	{
-		if (type == "GLB" && readPlayerChat)
-		{
-			speak(name, readPlayerName ? tfm::format("%s says: %s", name, text) : text);
-		}
-		else if (type == "SYS" && readSystemMessages)
-		{
-			// Unfortunately this includes /me messages, there is no way of telling them apart
-			speak("", text);
-		}
+		speak(name, readPlayerName ? tfm::format("%s says: %s", name, text) : text);
+	}
+	else if (type == "SYS" && readSystemMessages)
+	{
+		// Unfortunately this includes /me messages, there is no way of telling them apart
+		speak("", text);
 	}
 }
 
@@ -101,38 +104,35 @@ void speakGameChatMessage(GameChatType type, std::string name, std::string text,
 		"has turned off the crate finder.",
 	};
 
-	if (speakers.size())
+	if (type == GameChatType::Normal && readPlayerChat)
 	{
-		if (type == GameChatType::Normal && readPlayerChat)
-		{
-			speak(name, readPlayerName ? tfm::format("%s says: %s", name, text) : text);
-		}
-		else if (type == GameChatType::Team && readPlayerChat)
-		{
-			speak(name, readPlayerName ? tfm::format("%s says to team: %s", name, text) : text);
-		}
-		else if (type == GameChatType::Anonymous && readPlayerChat)
-		{
-			speak(name, readPlayerName ? tfm::format("Anonymous message: %s", text) : text);
-		}
-		else if (type == GameChatType::WhisperTo && readPlayerChat)
-		{
-			// TODO whats my name
-			speak("", readPlayerName ? tfm::format("Whisper to %s: %s", name, text) : text);
-		}
-		else if (type == GameChatType::WhisperFrom && readPlayerChat)
-		{
-			speak(name, readPlayerName ? tfm::format("Whisper from %s: %s", name, text) : text);
-		}
-		else if (type == GameChatType::Action
-			&& (readSystemMessages || std::none_of(systemMsgsEndWith.begin(), systemMsgsEndWith.end(), [&text](std::string s) { return text.ends_with(s); })))
-		{
-			speak("", text);
-		}
-		else if (type == GameChatType::System && readSystemMessages)
-		{
-			speak("", text);
-		}
+		speak(name, readPlayerName ? tfm::format("%s says: %s", name, text) : text);
+	}
+	else if (type == GameChatType::Team && readPlayerChat)
+	{
+		speak(name, readPlayerName ? tfm::format("%s says to team: %s", name, text) : text);
+	}
+	else if (type == GameChatType::Anonymous && readPlayerChat)
+	{
+		speak(name, readPlayerName ? tfm::format("Anonymous message: %s", text) : text);
+	}
+	else if (type == GameChatType::WhisperTo && readPlayerChat)
+	{
+		// TODO whats my name
+		speak("", readPlayerName ? tfm::format("Whisper to %s: %s", name, text) : text);
+	}
+	else if (type == GameChatType::WhisperFrom && readPlayerChat)
+	{
+		speak(name, readPlayerName ? tfm::format("Whisper from %s: %s", name, text) : text);
+	}
+	else if (type == GameChatType::Action
+		&& (readSystemMessages || std::none_of(systemMsgsEndWith.begin(), systemMsgsEndWith.end(), [&text](std::string s) { return text.ends_with(s); })))
+	{
+		speak("", text);
+	}
+	else if (type == GameChatType::System && readSystemMessages)
+	{
+		speak("", text);
 	}
 }
 
@@ -175,15 +175,15 @@ void setVolume(std::string args)
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
-	switch (ul_reason_for_call)
-	{
+	switch (ul_reason_for_call) {
 		case DLL_PROCESS_ATTACH:
-			try
-			{
+			try {
+				auto start = std::chrono::high_resolution_clock::now();
+				decltype(start) finish;
+
 				const char iniPath[] = ".\\wkTTS.ini";
 				const int moduleEnabled = GetPrivateProfileIntA("General", "EnableModule", 1, iniPath);
-				if (!moduleEnabled)
-				{
+				if (!moduleEnabled) {
 					return TRUE;
 				}
 				useDebugPrint = GetPrivateProfileIntA("General", "UseDebugPrint", 0, iniPath);
@@ -202,26 +202,34 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 				GameChat::registerCommandCallback("shutup", &shutUp);
 				GameChat::registerCommandCallback("tts", &setVolume);
 
-				const int maxVoices = 50;
-				char voicePath[MAX_PATH];
-				for (int i = 0; i < maxVoices; i++)
-				{
-					GetPrivateProfileStringA("TTS", tfm::format("Voice%d", i).c_str(), "", (LPSTR)&voicePath, sizeof(voicePath), iniPath);
-					if (strlen(voicePath))
-					{
-						Speaker::loadVoice(voicePath);
-					}
-				}
+				loaderThread = std::thread([=](){
+					try {
+						const int maxVoices = 50;
+						char voicePath[MAX_PATH];
+						for (int i = 0; i < maxVoices; i++) {
+							GetPrivateProfileStringA("TTS", tfm::format("Voice%d", i).c_str(), "", (LPSTR) &voicePath, sizeof(voicePath), iniPath);
+							if (strlen(voicePath)) {
+								Speaker::loadVoice(voicePath);
+							}
+						}
 
-				const float volume = GetPrivateProfileIntA("TTS", "Volume", 100, iniPath) / 100.f;
-				const int maxSpeakers = 8;
-				for (int i = 0; i < maxSpeakers; i++)
-				{
-					speakers.push_back(new Speaker(volume));
-				}
+						const float volume = GetPrivateProfileIntA("TTS", "Volume", 100, iniPath) / 100.f;
+						const int maxSpeakers = 8;
+						for (int i = 0; i < maxSpeakers; i++) {
+							speakers.push_back(new Speaker(volume));
+						}
+					}
+					catch (std::exception &e) {
+						MessageBoxA(0, e.what(), PROJECT_NAME " " PROJECT_VERSION " (" __DATE__ ")", MB_ICONERROR);
+					}
+				});
+				loaderThread.detach();
+
+				finish = std::chrono::high_resolution_clock::now();
+				std::chrono::duration<double> elapsed = finish - start;
+				debugf("wkTTS startup took %lf seconds\n", elapsed.count());
 			}
-			catch (std::exception &e)
-			{
+			catch (std::exception &e) {
 				MessageBoxA(0, e.what(), PROJECT_NAME " " PROJECT_VERSION " (" __DATE__ ")", MB_ICONERROR);
 			}
 			break;
